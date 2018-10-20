@@ -1,7 +1,5 @@
 #include "MPC.h"
-#include <cppad/cppad.hpp>
-#include <cppad/ipopt/solve.hpp>
-#include "Eigen-3.3/Eigen/Core"
+
 
 using CppAD::AD;
 
@@ -161,32 +159,30 @@ MPC::~MPC() {}
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
   size_t i;
-  typedef CPPAD_TESTVECTOR(double) Dvector;
+  
 
   // TODO: Set the number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 0;
+  size_t n_vars = 6 * N + 2 * (N-1);
   // TODO: Set the number of constraints
-  size_t n_constraints = 0;
+  size_t n_constraints = 6 * N;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
   Dvector vars(n_vars);
-  for (int i = 0; i < n_vars; i++) {
-    vars[i] = 0;
-  }
+  initVars(vars, state);
 
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
-  // TODO: Set lower and upper limits for variables.
+  processVarsRange(vars_lowerbound, vars_upperbound);
 
-  // Lower and upper limits for the constraints
-  // Should be 0 besides initial state.
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
+  processConstraintsRange(constraints_lowerbound, constraints_upperbound);
+
   for (int i = 0; i < n_constraints; i++) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
@@ -234,4 +230,54 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
   return {};
+}
+
+
+void MPC::initVars(Dvector& vars, const Eigen::VectorXd state)
+{
+  // Initial value of the independent variables.
+  // Should be 0 except for the initial values.
+  for (int i = 0; i < vars.size(); i++) {
+    vars[i] = 0;
+  }
+
+    // Set the initial variable values
+  vars[x_start_index]   =  state(0);  //x
+  vars[y_start_index]   =  state(1);  //y
+  vars[psi_start_index] =  state(2);  //psi
+  vars[v_start_index]   =  state(3);  //v
+  vars[cte_start_index] =  state(4);  //cte
+  vars[epsi_start_index]=  state(5);  //epsi
+
+}
+
+void MPC::processVarsRange(Dvector& vars_lowerbound, Dvector& vars_upperbound)
+{
+  // Set all non-actuators upper and lower limits
+  // to the max negative and positive values.
+  for (int i = 0; i < steering_angle_start_index; i++) {
+    vars_lowerbound[i] = std::numeric_limits<double>::min();
+    vars_upperbound[i] = std::numeric_limits<double>::max();
+  }
+
+  // The upper and lower limits of delta are set to -25 and 25
+  // degrees (values in radians).
+  // NOTE: Feel free to change this to something else.
+  for (int i = steering_angle_start_index; i < a_start_index; i++) {
+    vars_lowerbound[i] = - 25 * 0.01745329;
+    vars_upperbound[i] =  25 * 0.01745329;
+  }
+
+  // Acceleration/decceleration upper and lower limits.
+  // NOTE: Feel free to change this to something else.
+  for (int i = a_start_index; i < vars_lowerbound.size(); i++) {
+    vars_lowerbound[i] = -1.0;
+    vars_upperbound[i] = 1.0;
+  }
+}
+
+
+void MPC::processConstraintsRange(Dvector& constraints_lowerbound, Dvector& constraints_upperbound)
+{
+
 }
