@@ -24,9 +24,9 @@ class MPC {
 
   void initVars(Dvector& vars, const Eigen::VectorXd state);
 
-  void processVarsRange(Dvector& vars_lowerbound, Dvector& vars_upperbound);
+  void setVarsLimitRange(Dvector& vars_lowerbound, Dvector& vars_upperbound);
 
-  void processConstraintsRange(Dvector& constraints_lowerbound, Dvector& constraints_upperbound);
+  void initConstraints(Dvector& constraints_lowerbound, Dvector& constraints_upperbound, const Eigen::VectorXd state);
 
 };
 

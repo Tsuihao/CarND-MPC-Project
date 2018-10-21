@@ -1,6 +1,4 @@
 #include "MPC.h"
-
-
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
@@ -150,17 +148,17 @@ public:
     Eigen::VectorXd coeffs;  // Fitted polynomial coefficients
 };
 
-//
-// MPC class definition implementation.
-//
+
+/////////////////////////////////////////////////////////////////////////////////////////////
 MPC::MPC() {}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
 MPC::~MPC() {}
 
+/////////////////////////////////////////////////////////////////////////////////////////////
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
-  size_t i;
   
-
   // TODO: Set the number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
   // element vector and there are 10 timesteps. The number of variables is:
@@ -177,16 +175,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
-  processVarsRange(vars_lowerbound, vars_upperbound);
+  setVarsLimitRange(vars_lowerbound, vars_upperbound);
 
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
-  processConstraintsRange(constraints_lowerbound, constraints_upperbound);
-
-  for (int i = 0; i < n_constraints; i++) {
-    constraints_lowerbound[i] = 0;
-    constraints_upperbound[i] = 0;
-  }
+  initConstraints(constraints_lowerbound, constraints_upperbound, state);
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
@@ -229,10 +222,19 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {};
+  std::vector<double> mpc_results;
+  mpc_results.push_back(solution.x[steering_angle_start_index]);
+  mpc_results.push_back(solution.x[a_start_index]);
+  for (int t = 0; t < N; t++)
+  {  
+    mpc_results.push_back(solution.x[x_start_index+t]);
+    mpc_results.push_back(solution.x[y_start_index+t]);
+  }
+
+  return mpc_results;
 }
 
-
+/////////////////////////////////////////////////////////////////////////////////////////////
 void MPC::initVars(Dvector& vars, const Eigen::VectorXd state)
 {
   // Initial value of the independent variables.
@@ -242,16 +244,17 @@ void MPC::initVars(Dvector& vars, const Eigen::VectorXd state)
   }
 
     // Set the initial variable values
-  vars[x_start_index]   =  state(0);  //x
-  vars[y_start_index]   =  state(1);  //y
-  vars[psi_start_index] =  state(2);  //psi
-  vars[v_start_index]   =  state(3);  //v
-  vars[cte_start_index] =  state(4);  //cte
-  vars[epsi_start_index]=  state(5);  //epsi
+  vars[x_start_index]   =  state[0];  // x
+  vars[y_start_index]   =  state[1];  // y
+  vars[psi_start_index] =  state[2];  // psi
+  vars[v_start_index]   =  state[3];  // v
+  vars[cte_start_index] =  state[4];  // cte
+  vars[epsi_start_index]=  state[5];  // epsi
 
 }
 
-void MPC::processVarsRange(Dvector& vars_lowerbound, Dvector& vars_upperbound)
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MPC::setVarsLimitRange(Dvector& vars_lowerbound, Dvector& vars_upperbound)
 {
   // Set all non-actuators upper and lower limits
   // to the max negative and positive values.
@@ -276,8 +279,36 @@ void MPC::processVarsRange(Dvector& vars_lowerbound, Dvector& vars_upperbound)
   }
 }
 
-
-void MPC::processConstraintsRange(Dvector& constraints_lowerbound, Dvector& constraints_upperbound)
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MPC::initConstraints(Dvector& constraints_lowerbound, Dvector& constraints_upperbound, const Eigen::VectorXd state)
 {
+    // Lower and upper limits for constraints
+    // All of these should be 0 except the initial
+    // state indices.
+    for (int i = 0; i < constraints_lowerbound.size(); i++) {
+    constraints_lowerbound[i] = 0;
+    constraints_upperbound[i] = 0;
+  }
 
+    double x = state[0];
+    double y = state[1];
+    double psi = state[2];
+    double v = state[3];
+    double cte = state[4];
+    double epsi = state[5];
+
+    constraints_lowerbound[x_start_index] = x;
+    constraints_lowerbound[y_start_index] = y;
+    constraints_lowerbound[psi_start_index] = psi;
+    constraints_lowerbound[v_start_index] = v;
+    constraints_lowerbound[cte_start_index] = cte;
+    constraints_lowerbound[epsi_start_index] = epsi;
+
+    constraints_upperbound[x_start_index] = x;
+    constraints_upperbound[y_start_index] = y;
+    constraints_upperbound[psi_start_index] = psi;
+    constraints_upperbound[v_start_index] = v;
+    constraints_upperbound[cte_start_index] = cte;
+    constraints_upperbound[epsi_start_index] = epsi;
+    
 }
