@@ -11,7 +11,7 @@
 
 // for convenience
 using json = nlohmann::json;
-
+using namespace std;
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -77,7 +77,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -91,6 +91,8 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double steer_angle = j[1]["steering_angle"];
+          double throttle_value = j[1]["throttle"];
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,13 +100,48 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          Eigen::VectorXd waypoints_x_in_VCS(ptsx.size()); // waypoint x in vehicle coordinate system (VCS)
+          Eigen::VectorXd waypoints_y_in_VCS(ptsx.size()); // waypoint y in vehicle coordinate system (VCS)
 
+          // transform waypoints to be from car's perspective
+          // this means we can consider px = 0, py = 0, and psi = 0
+          // greatly simplifying future calculations
+          for (int i = 0; i < ptsx.size(); i++) {
+            double dx = ptsx[i] - px;
+            double dy = ptsy[i] - py;
+            waypoints_x_in_VCS[i] = dx * cos(psi) + dy * sin(psi);
+            waypoints_y_in_VCS[i] = -dx * sin(psi) + dy * cos(psi);
+          }
+
+
+          auto coeffs = polyfit(waypoints_x_in_VCS, waypoints_y_in_VCS, 3);
+          double cte = polyeval(coeffs, 0);  // px = 0, py = 0
+          double epsi = -atan(coeffs[1]);   // p
+
+          // Kinematic model is used to predict vehicle state at the actual
+          // moment of control (current time + delay dt)
+          const double dt = 0.1;
+          const double Lf = 2.67;
+          const double px_act = v * dt;
+          const double py_act = 0;
+          const double psi_act = - v * steer_angle * dt / Lf;
+          const double v_act = v + throttle_value * dt;
+          const double cte_act = cte + v * sin(epsi) * dt;
+          const double epsi_act = epsi + psi_act; 
+          Eigen::VectorXd state(6);
+          state << px_act, py_act, psi_act, v_act, cte_act, epsi_act; 
+          
+          
+          auto vars = mpc.Solve(state, coeffs);
+          steer_angle = vars[0];
+          throttle_value = vars[1];
+			
+          cout<<"angle="<<steer_angle<<endl;
+          cout<<"a="<<throttle_value<<endl;
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = -steer_angle/(deg2rad(25));
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
@@ -113,6 +150,8 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
+          mpc_x_vals = mpc.getMpcX();
+          mpc_x_vals = mpc.getMpcY();
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
@@ -124,12 +163,18 @@ int main() {
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
 
+          for (double i = 0; i < 100; i += 3){
+            next_x_vals.push_back(i);
+            next_y_vals.push_back(polyeval(coeffs, i));
+          }
+
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
+          
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.

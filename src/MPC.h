@@ -6,7 +6,6 @@
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
 
-using namespace std;
 
 class MPC {
  public:
@@ -16,7 +15,11 @@ class MPC {
 
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuations.
-  vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
+  std::vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
+  
+  const std::vector<double>& getMpcX() const;
+
+  const std::vector<double>& getMpcY() const;
 
  protected:
 
@@ -27,6 +30,10 @@ class MPC {
   void setVarsLimitRange(Dvector& vars_lowerbound, Dvector& vars_upperbound);
 
   void initConstraints(Dvector& constraints_lowerbound, Dvector& constraints_upperbound, const Eigen::VectorXd state);
+  
+private:
+  std::vector<double> mpc_x;
+  std::vector<double> mpc_y;
 
 };
 
