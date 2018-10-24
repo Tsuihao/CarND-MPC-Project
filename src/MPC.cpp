@@ -2,8 +2,8 @@
 using CppAD::AD;
 using namespace std;
 // TODO: Set the timestep length and duration
-size_t N = 10;
-double dt = 0.01;
+size_t N = 16;
+double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -21,6 +21,7 @@ const double Lf = 2.67;
 const double ref_v = 70.0;
 const double ref_cte = 0.0; // want cte = 0
 const double ref_epsi = 0.0; // want the angle differnece = 0
+int latency_steps = 0.1/dt;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -38,32 +39,28 @@ size_t a_start = delta_start + N - 1; // only has N-1
 class FG_eval 
 {
 public:
-
+  
   FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
 
   // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
   void operator()(ADvector& fg, const ADvector& vars) {
-    // TODO: implement MPC
-    // NOTE: You'll probably go back and forth between this function and
-    // the Solver function below.
 
     /* Design cost function */
     buildCostFunc(fg, vars);
 
     /* Set up constriants */
     setUpConstraints(fg, vars);
-
-  }
+    }
+  
 protected:
-
     void buildCostFunc(ADvector& fg, const ADvector& vars)
     {
       // fg[0] is the cost
-      // TODO: can add the weights here!
       fg[0] = 0; // init the cost function with 0
       
+      /* weights tuning */
       static const double weight_cte = 1;
       static const double weight_epsi = 1;
       static const double weight_v = 1;
@@ -87,11 +84,11 @@ protected:
 
       // Minimize the value gap between sequential actuations.
       for (size_t t = 0; t < N - 2; t++) {
-        fg[0] += 500 *  CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-        fg[0] += 1 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+        fg[0] += 1000 *  CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+        fg[0] += weight_acceleration * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
       }
     }
-
+  
      void setUpConstraints(ADvector& fg, const ADvector& vars)
      {
       //
@@ -155,17 +152,11 @@ protected:
         fg[1 + epsi_start + t]= epsi1 - ((psi0 - psides0) + v0 * steering0 / Lf * dt);
       }
      }
-     
-public: 
+private:
+  
     Eigen::VectorXd coeffs;  // Fitted polynomial coefficients
+
 };
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-MPC::MPC() {}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-MPC::~MPC() {}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
@@ -180,20 +171,31 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // TODO: Set the number of constraints
   size_t n_constraints = 6 * N;
   
+  typedef CPPAD_TESTVECTOR(double) Dvector;
   /* Init the vars */
   Dvector vars(n_vars);
-   cout<<"vars.size="<<vars.size()<<endl;
   initVars(vars, state);
-  
-  /* */
+ 
+  /* Set the boundaries of vars */
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
-  cout<<"vars_lowerbound.size="<<vars_lowerbound.size()<<endl;
   setVarsLimitRange(vars_lowerbound, vars_upperbound);
-
+  
+  /* Handling the the latency */
+  for (size_t i= delta_start; i < delta_start + latency_steps; i++)
+  {
+    vars_lowerbound [i] = this->prev_delta;
+    vars_upperbound [i] = this->prev_delta;
+  }
+  for (size_t i= a_start; i < a_start + latency_steps; i++)
+  {
+    vars_lowerbound [i] = this->prev_a;
+    vars_upperbound [i] = this->prev_a;
+  }
+ 
+  /* Init contraints */
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
-  cout<<"constraints_lowerbound.size="<<constraints_lowerbound.size()<<endl;
   initConstraints(constraints_lowerbound, constraints_upperbound, state);
 
   // object that computes objective and constraints
@@ -227,7 +229,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Check some of the solution values
   ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
-
+  
   // Cost
   auto cost = solution.obj_value;
   std::cout << "Cost " << cost << std::endl;
@@ -238,18 +240,19 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
   
-  mpc_x.clear();
-  mpc_y.clear();
-  mpc_x.resize(N, 0);
-  mpc_y.resize(N, 0);
+  this->mpc_x.clear();
+  this->mpc_y.clear();
+  this->mpc_x.resize(N, 0);
+  this->mpc_y.resize(N, 0);
+  
   // Store in member variable
   for(size_t i = 0; i < N; ++i)
   {
-    mpc_x[i] = solution.x[x_start + i];
-    mpc_y[i] = solution.x[y_start + i];
+    this->mpc_x[i] = solution.x[x_start + i];
+    this->mpc_y[i] = solution.x[y_start + i];
   }
 
-  return {solution.x[delta_start], solution.x[a_start]};
+  return {solution.x[delta_start + latency_steps], solution.x[a_start + latency_steps]};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,8 +288,8 @@ void MPC::setVarsLimitRange(Dvector& vars_lowerbound, Dvector& vars_upperbound)
   // degrees (values in radians).
   // NOTE: Feel free to change this to something else.
   for (size_t i = delta_start; i < a_start; i++) {
-    vars_lowerbound[i] = - 25 * 0.01745329;
-    vars_upperbound[i] =  25 * 0.01745329;
+    vars_lowerbound[i] = - deg2rad(25);
+    vars_upperbound[i] =  deg2rad(25);
   }
 
   // Acceleration/decceleration upper and lower limits.
@@ -330,14 +333,26 @@ void MPC::initConstraints(Dvector& constraints_lowerbound, Dvector& constraints_
     constraints_upperbound[epsi_start] = epsi;
     
 }
-
+///////////////////////////////////////////////////////////////////////////////////////////////
 const std::vector<double>& MPC::getMpcX() const
 {
-    return mpc_x; 
+    return this->mpc_x; 
 }
 
-
+///////////////////////////////////////////////////////////////////////////////////////////////
 const std::vector<double>& MPC::getMpcY() const
 {
-    return mpc_y; 
+    return this->mpc_y; 
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+void MPC::setPrevDelta(const double delta)
+{
+   this->prev_delta = delta;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+void MPC::setPrevA(const double a)
+{
+   this->prev_a = a;
 }

@@ -6,12 +6,12 @@
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
 
+// For converting back and forth between radians and degrees.
+constexpr double pi() { return M_PI; }
+static double deg2rad(double x) { return x * pi() / 180; }
 
 class MPC {
  public:
-  MPC();
-
-  virtual ~MPC();
 
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuations.
@@ -20,6 +20,10 @@ class MPC {
   const std::vector<double>& getMpcX() const;
 
   const std::vector<double>& getMpcY() const;
+  
+  void setPrevDelta(const double);
+  
+  void setPrevA(const double);
 
  protected:
 
@@ -32,8 +36,10 @@ class MPC {
   void initConstraints(Dvector& constraints_lowerbound, Dvector& constraints_upperbound, const Eigen::VectorXd state);
   
 private:
-  std::vector<double> mpc_x;
-  std::vector<double> mpc_y;
+    std::vector<double> mpc_x;
+  	std::vector<double> mpc_y;
+    double prev_delta;
+ 	double prev_a;
 
 };
 
