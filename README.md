@@ -8,7 +8,7 @@ Self-Driving Car Engineer Nanodegree Program
 
 
 ## Introduction
-![IMAGE ALT TEXT](./images/MPC.png)
+![IMAGE ALT TEXT](./images/MPC.PNG)
 
 ---
 
