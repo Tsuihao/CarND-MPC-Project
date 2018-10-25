@@ -16,20 +16,19 @@ As shown in the above figure, there are 6 states in **state**:
 
 ![IMAGE ALT TEXT](./images/kinematicModel.PNG)
 
-To describe the kinematic state of the vehicle, we need x, y, v, and the yaw. Be aware that the yaw update formula has relation to the velocity (v) and the half-length of the vehicle Lf.
+To describe the kinematic state of the vehicle, we need x, y, v, and the yaw. Be aware that the yaw update formula has relation to the velocity (v) and the half-length of the vehicle (Lf).
 
 ![IMAGE ALT TEXT](./images/error.PNG)
-In addition, we use the cross track error (cte) and the (eψ) 
-is the desired orientation subtracted from the current orientation to observe how well the vehicle behaves.
+
+In addition, we use the cross track error (cte) and the desired orientation subtracted from the current orientation (eψ) as reference to observe how well the vehicle behaves.
 
 ### Hyperparameter
 
-In this project, two important hyperparameters to tune is the number of timestemps (N) and the time elapses between  actuations (dt). Their multiple result **Tau** will give the period of time that the output can **foresee**.
+In this project, two important hyperparameters need to be tuned are the number of timestemps (N) and the time elapses between actuations (dt). Their multiple result **Tau** gives the period of time that the vehicle can **foresee**.
 
-In the naive perspective, we would like to have **Tau** as large as possible, which means that we can predict a sufficient period. However, consider the driving environment is dynamic and involve with other objects, the value of **Tau** should be within reasonable range.
+In the naive perspective, we would like to have **Tau** as large as possible, which means that we can predict a sufficient period. However, consider the dynamic driving environment and other objects, the value of **Tau** should be within a reasonable range.
 
-Besides, from the perspective of algorithm complexity, N will affect the size of the array.
-The bigger the size of the array is, the longer time our optimal solution need to take.
+Besides, from the perspective of algorithm complexity, N affects the size of the array. The bigger the size of the array is, the longer time it will take for our solver to find out the optimial solution.
 
 
 ### Waypoints
