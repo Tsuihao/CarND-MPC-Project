@@ -8,7 +8,40 @@ Self-Driving Car Engineer Nanodegree Program
 
 
 ## Introduction
+
+### Model parameters
 ![IMAGE ALT TEXT](./images/MPC.PNG)
+
+As shown in the above figure, there are 6 states in **state**:
+
+![IMAGE ALT TEXT](./images/kinematicModel.PNG)
+
+To describe the kinematic state of the vehicle, we need x, y, v, and the yaw. Be aware that the yaw update formula has relation to the velocity (v) and the half-length of the vehicle Lf.
+
+![IMAGE ALT TEXT](./images/error.PNG)
+In addition, we use the cross track error (cte) and the (eψ) 
+is the desired orientation subtracted from the current orientation to observe how well the vehicle behaves.
+
+### Hyperparameter
+
+In this project, two important hyperparameters to tune is the number of timestemps (N) and the time elapses between  actuations (dt). Their multiple result **Tau** will give the period of time that the output can **foresee**.
+
+In the naive perspective, we would like to have **Tau** as large as possible, which means that we can predict a sufficient period. However, consider the driving environment is dynamic and involve with other objects, the value of **Tau** should be within reasonable range.
+
+Besides, from the perspective of algorithm complexity, N will affect the size of the array.
+The bigger the size of the array is, the longer time our optimal solution need to take.
+
+
+### Waypoints
+
+The provided waypoints are in Map Coordinate System (MCS). In order to visualize along the driving, we need to transform the waypoints into Vehicle Coordinate System (VCS). After transformation, the 3rd order of polynomial fitting is implemented. The reason why using 3rd order is driving scenario dependent. If the driving environment is only on the highway, then the 1st/2nd order will be enough. However, in the provided driving track, there is S curve which needs to be fitted with 3rd order polynomial. In the real world, the 3rd polynomial fitting is also a reasonable choice.
+
+
+### Actuator latency
+
+In this project, we need to consider the 100ms actuator latency.
+One solution to handle this is after the **ipopt solver** conduct the optimal actuator combination (steering angle and acceleration value), instead of directly using this optimal combination, we add the latency on top of that. 
+
 
 ---
 
