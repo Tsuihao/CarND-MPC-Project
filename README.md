@@ -41,6 +41,10 @@ The provided waypoints are in Map Coordinate System (MCS). In order to visualize
 In this project, we need to consider the 100ms actuator latency.
 One solution to handle this is after the **ipopt solver** conduct the optimal actuator combination (steering angle and acceleration value), instead of directly using this optimal combination, we add the latency on top of that. 
 
+---
+## Review
+
+[#1](https://review.udacity.com/#!/reviews/1527335)
 
 ---
 
